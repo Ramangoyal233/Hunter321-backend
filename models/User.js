@@ -47,6 +47,18 @@ const userSchema = new mongoose.Schema({
     city: String,
     timezone: String
   },
+  firstName: { type: String, trim: true },
+  lastName: { type: String, trim: true },
+  phone: { type: String, trim: true },
+  dateOfBirth: { type: Date },
+  gender: { type: String, enum: ['male', 'female', 'other'] },
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    zip: String,
+    country: String
+  },
   profile: {
     bio: String,
     avatar: String,
@@ -54,7 +66,8 @@ const userSchema = new mongoose.Schema({
       github: String,
       twitter: String,
       linkedin: String
-    }
+    },
+    skills: [String]
   },
   createdAt: {
     type: Date,

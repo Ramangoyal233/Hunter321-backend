@@ -194,15 +194,15 @@ router.put('/subcategories/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Subcategory not found' });
     }
 
-    const { name, description, icon, parentId } = req.body;
+    const { name, description, icon, categoryId } = req.body;
     
-    // If parent is being changed, verify the new parent exists
-    if (parentId && parentId !== subcategory.parent.toString()) {
-      const parentCategory = await Category.findById(parentId);
+    // If category is being changed, verify the new category exists
+    if (categoryId && categoryId !== subcategory.category.toString()) {
+      const parentCategory = await Category.findById(categoryId);
       if (!parentCategory) {
         return res.status(404).json({ message: 'Parent category not found' });
       }
-      subcategory.parent = parentId;
+      subcategory.category = categoryId;
     }
 
     subcategory.name = name || subcategory.name;
@@ -241,11 +241,6 @@ router.delete('/subcategories/:id', adminAuth, async (req, res) => {
 router.get('/writeups', adminAuth, async (req, res) => {
   try {
     const writeups = await Writeup.find()
-      .populate({
-        path: 'author',
-        select: 'username email name',
-        refPath: 'authorModel'
-      })
       .populate('category', 'name')
       .populate('subcategory', 'name')
       .sort({ createdAt: -1 });
@@ -258,33 +253,43 @@ router.get('/writeups', adminAuth, async (req, res) => {
 
 router.post('/writeups', adminAuth, async (req, res) => {
   try {
-    const { category, subcategory, ...writeupData } = req.body;
+    console.log('Received writeup data:', req.body);
+    const { category, subcategory, tags, ...writeupData } = req.body;
+    
+    // Ensure tags is an array and filter out empty strings
+    const processedTags = Array.isArray(tags) ? tags.filter(tag => tag && tag.trim()) : [];
     
     const writeup = new Writeup({
       ...writeupData,
       category,
       subcategory: subcategory || null,
-      author: req.admin._id
+      tags: processedTags
     });
     
+    console.log('Writeup object before save:', writeup);
     await writeup.save();
-    await writeup.populateCategoryInfo();
+    console.log('Writeup saved successfully:', writeup);
     res.status(201).json(writeup);
   } catch (error) {
+    console.error('Error creating writeup:', error);
     res.status(400).json({ message: 'Error creating writeup', error: error.message });
   }
 });
 
 router.put('/writeups/:id', adminAuth, async (req, res) => {
   try {
-    const { category, subcategory, ...updateData } = req.body;
+    const { category, subcategory, tags, ...updateData } = req.body;
+    
+    // Ensure tags is an array and filter out empty strings
+    const processedTags = Array.isArray(tags) ? tags.filter(tag => tag && tag.trim()) : [];
     
     const writeup = await Writeup.findByIdAndUpdate(
       req.params.id,
       {
         ...updateData,
         category,
-        subcategory: subcategory || null
+        subcategory: subcategory || null,
+        tags: processedTags
       },
       { new: true, runValidators: true }
     );
@@ -293,7 +298,6 @@ router.put('/writeups/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Writeup not found' });
     }
     
-    await writeup.populateCategoryInfo();
     res.json(writeup);
   } catch (error) {
     res.status(400).json({ message: 'Error updating writeup', error: error.message });
@@ -318,7 +322,6 @@ router.delete('/writeups/:id', adminAuth, async (req, res) => {
 router.get('/writeups/:id', adminAuth, async (req, res) => {
   try {
     const writeup = await Writeup.findById(req.params.id)
-      .populate('author', 'username')
       .populate('category', 'name')
       .populate('subcategory', 'name');
     
@@ -329,6 +332,29 @@ router.get('/writeups/:id', adminAuth, async (req, res) => {
     res.json(writeup);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching writeup', error: error.message });
+  }
+});
+
+// Toggle writeup publish status
+router.patch('/writeups/:id/publish', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const writeup = await Writeup.findById(id);
+    if (!writeup) {
+      return res.status(404).json({ message: 'Writeup not found' });
+    }
+    
+    // Toggle the publish status
+    writeup.isPublished = !writeup.isPublished;
+    await writeup.save();
+    
+    res.json({
+      message: writeup.isPublished ? 'Writeup published successfully' : 'Writeup unpublished successfully',
+      writeup
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating writeup publish status', error: error.message });
   }
 });
 
@@ -651,6 +677,21 @@ router.get('/analytics/campaigns', adminAuth, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all unique tags
+router.get('/tags', adminAuth, async (req, res) => {
+  try {
+    const tags = await Writeup.aggregate([
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+    
+    res.json({ tags: tags.map(tag => ({ name: tag._id, count: tag.count })) });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching tags', error: error.message });
   }
 });
 

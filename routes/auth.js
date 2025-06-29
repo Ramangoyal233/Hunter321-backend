@@ -28,7 +28,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 2 * 1024 * 1024 // 2MB limit for profile images
   },
   fileFilter: function (req, file, cb) {
     const allowedTypes = /jpeg|jpg|png|gif/;
@@ -235,7 +235,10 @@ router.get('/me', userAuth, async (req, res) => {
     // Convert user to plain object and add full image URL
     const userObj = user.toObject();
     if (userObj.profile?.avatar) {
-      userObj.profile.avatar = `http://192.168.29.240:5001${userObj.profile.avatar}`;
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? (process.env.BASE_URL || 'https://your-backend-app.onrender.com')
+        : 'http://192.168.29.240:5001';
+      userObj.profile.avatar = `${baseUrl}${userObj.profile.avatar}`;
     }
 
     res.json(userObj);
@@ -324,22 +327,32 @@ router.put('/update-profile', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { username, email, bio, socialLinks, skills, location } = req.body;
+    const { username, email, firstName, lastName, phone, dateOfBirth, gender, address, bio, socialLinks, skills, location } = req.body;
 
     // Update user fields
     if (username) user.username = username;
     if (email) user.email = email;
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (phone) user.phone = phone;
+    if (dateOfBirth) user.dateOfBirth = dateOfBirth;
+    if (gender) user.gender = gender;
+    if (address) user.address = address;
+    if (location) user.location = location;
+
     if (bio) user.profile.bio = bio;
     if (socialLinks) user.profile.socialLinks = socialLinks;
     if (skills) user.profile.skills = skills;
-    if (location) user.profile.location = location;
 
     await user.save();
 
     // Convert user to plain object and add full image URL
     const userObj = user.toObject();
     if (userObj.profile?.avatar) {
-      userObj.profile.avatar = `http://192.168.29.240:5001${userObj.profile.avatar}`;
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? (process.env.BASE_URL || 'https://your-backend-app.onrender.com')
+        : 'http://192.168.29.240:5001';
+      userObj.profile.avatar = `${baseUrl}${userObj.profile.avatar}`;
     }
 
     res.json(userObj);

@@ -47,12 +47,20 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit for both files
+    fileSize: 50 * 1024 * 1024 // 50MB limit for PDFs, 2MB for images (handled in fileFilter)
   },
   fileFilter: function (req, file, cb) {
     if (file.fieldname === 'pdf' && file.mimetype === 'application/pdf') {
+      // Check PDF file size (50MB limit)
+      if (file.size > 50 * 1024 * 1024) {
+        return cb(new Error('PDF file too large. Max 50MB allowed.'));
+      }
       cb(null, true);
     } else if (file.fieldname === 'coverImage' && file.mimetype.startsWith('image/')) {
+      // Check image file size (2MB limit)
+      if (file.size > 2 * 1024 * 1024) {
+        return cb(new Error('Image file too large. Max 2MB allowed.'));
+      }
       cb(null, true);
     } else {
       cb(new Error('Invalid file type!'));
@@ -794,7 +802,10 @@ router.post('/', adminAuth, upload, async (req, res) => {
       message = error.message;
     } else if (error.code === 'LIMIT_FILE_SIZE') {
       statusCode = 400;
-      message = 'File too large. Max 5MB allowed.';
+      message = 'File too large. Max 50MB allowed.';
+    } else if (error.message && error.message.includes('too large')) {
+      statusCode = 400;
+      message = error.message;
     }
 
     return res.status(statusCode).json({ 

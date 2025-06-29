@@ -60,7 +60,12 @@ const settingsSchema = new mongoose.Schema({
   maxFileSize: {
     type: Number,
     required: true,
-    default: 5 // in MB
+    default: 50 // in MB (for PDFs)
+  },
+  maxImageSize: {
+    type: Number,
+    required: true,
+    default: 2 // in MB (for images)
   },
   emailNotifications: {
     newUser: {

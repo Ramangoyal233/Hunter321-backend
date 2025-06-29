@@ -12,7 +12,6 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const booksRoutes = require('./routes/books');
 
-
 // Load environment variables
 dotenv.config();
 
@@ -20,10 +19,27 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.IO with proper settings
+// Get allowed origins from environment variable
+const getAllowedOrigins = () => {
+  const envOrigins = process.env.ALLOWED_ORIGINS;
+  const defaultOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  
+  if (envOrigins) {
+    // Split by comma and trim whitespace
+    const additionalOrigins = envOrigins.split(',').map(origin => origin.trim());
+    return [...defaultOrigins, ...additionalOrigins];
+  }
+  
+  return defaultOrigins;
+};
+
+const allowedOrigins = getAllowedOrigins();
+console.log('🌐 Allowed CORS Origins:', allowedOrigins);
+
+// Configure Socket.IO with dynamic origins
 const io = socketIo(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.29.240:3000'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -37,15 +53,16 @@ const io = socketIo(server, {
 // Store io instance in app for use in routes
 app.set('io', io);
 
-// Middleware
+// Middleware with dynamic CORS origins
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.29.240:3000'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -56,7 +73,7 @@ app.use(settingsMiddleware);
 console.log(process.env.PORT);
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URL;
-console.log(process.env.MONGODB_URL);
+
 // Improved MongoDB connection with better error handling
 const connectWithRetry = async () => {
   try {
@@ -86,13 +103,11 @@ connectWithRetry();
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB connection error:', err);
   if (err.name === 'MongoServerSelectionError') {
-    
     setTimeout(connectWithRetry, 5000);
   }
 });
 
 mongoose.connection.on('disconnected', () => {
- 
   setTimeout(connectWithRetry, 5000);
 });
 
@@ -184,4 +199,5 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-})
+  console.log(`🌐 CORS enabled for origins:`, allowedOrigins);
+});

@@ -14,10 +14,6 @@ const writeupSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  author: {
-    type: String,
-    required: true
-  },
   difficulty: {
     type: String,
     enum: ['Easy', 'Medium', 'Hard', 'Expert'],

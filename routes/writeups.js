@@ -5,82 +5,65 @@ const Subcategory = require('../models/Subcategory');
 const { auth, userAuth } = require('../middleware/auth');
 const Writeup = require('../models/Writeup');
 
-// Get all writeups
+// Get all published writeups (public)
 router.get('/', async (req, res) => {
   try {
-   
-    
-    // Get all categories and subcategories with populated writeups
-    const categories = await Category.find()
-      .populate({
-        path: 'writeups',
-        populate: {
-          path: 'author',
-          select: 'username'
-        }
-      });
-      
-    const subcategories = await Subcategory.find()
-      .populate({
-        path: 'writeups',
-        populate: {
-          path: 'author',
-          select: 'username'
-        }
-      });
-    
-   
-    
-    // Use a Map to track unique writeups by their ID
-    const writeupsMap = new Map();
-    
-    // Add writeups from categories
-    categories.forEach(category => {
-      if (category.writeups && category.writeups.length > 0) {
-        category.writeups.forEach(writeup => {
-          if (!writeupsMap.has(writeup._id.toString())) {
-            writeupsMap.set(writeup._id.toString(), {
-              ...writeup.toObject(),
-              category: {
-                _id: category._id,
-                name: category.name,
-                slug: category.slug
-              }
-            });
-          }
-        });
-      }
+    const writeups = await Writeup.find({ isPublished: true })
+      .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
+      .sort({ createdAt: -1 });
+
+    const transformed = writeups.map(writeup => {
+      const obj = writeup.toObject();
+      return {
+        ...obj,
+        category: writeup.category ? {
+          _id: writeup.category._id,
+          name: writeup.category.name,
+          slug: writeup.category.slug
+        } : null,
+        subcategory: writeup.subcategory ? {
+          _id: writeup.subcategory._id,
+          name: writeup.subcategory.name,
+          slug: writeup.subcategory.slug
+        } : null
+      };
     });
-    
-    // Add writeups from subcategories
-    subcategories.forEach(subcategory => {
-      if (subcategory.writeups && subcategory.writeups.length > 0) {
-        subcategory.writeups.forEach(writeup => {
-          if (!writeupsMap.has(writeup._id.toString())) {
-            writeupsMap.set(writeup._id.toString(), {
-              ...writeup.toObject(),
-              category: {
-                _id: subcategory.parent,
-                name: subcategory.name,
-                slug: subcategory.slug,
-                isSubcategory: true
-              }
-            });
-          }
-        });
-      }
-    });
-    
-    // Convert Map to array and sort by creation date
-    const allWriteups = Array.from(writeupsMap.values())
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
-  
-    
-    res.json(allWriteups);
+    res.json(transformed);
   } catch (error) {
     console.error('Error fetching writeups:', error);
     res.status(500).json({ message: 'Error fetching writeups', error: error.message });
+  }
+});
+
+// Get all writeups (published and draft) for admin/debug
+router.get('/all', async (req, res) => {
+  try {
+    const writeups = await Writeup.find()
+      .populate('category', 'name slug')
+      .populate('subcategory', 'name slug')
+      .sort({ createdAt: -1 });
+
+    const transformed = writeups.map(writeup => {
+      const obj = writeup.toObject();
+      return {
+        ...obj,
+        category: writeup.category ? {
+          _id: writeup.category._id,
+          name: writeup.category.name,
+          slug: writeup.category.slug
+        } : null,
+        subcategory: writeup.subcategory ? {
+          _id: writeup.subcategory._id,
+          name: writeup.subcategory.name,
+          slug: writeup.subcategory.slug
+        } : null
+      };
+    });
+    res.json(transformed);
+  } catch (error) {
+    console.error('Error fetching all writeups:', error);
+    res.status(500).json({ message: 'Error fetching all writeups', error: error.message });
   }
 });
 
@@ -90,7 +73,6 @@ router.get('/recent', async (req, res) => {
     const recentWriteups = await Writeup.find({ isPublished: true })
       .sort({ createdAt: -1 })
       .limit(4)
-      .populate('author', 'username')
       .populate('category', 'name')
       .populate('subcategory', 'name');
 
@@ -108,22 +90,23 @@ router.get('/category/:categorySlug', async (req, res) => {
     
     // Find category
     const category = await Category.findOne({ slug: categorySlug })
-      .populate('writeups.author', 'username');
+      .populate('writeups');
       
     if (!category) {
       return res.status(404).json({ message: 'Category not found' });
     }
     
     // Find subcategories
-    const subcategories = await Subcategory.find({ parent: category._id })
-      .populate('writeups.author', 'username');
+    const subcategories = await Subcategory.find({ category: category._id })
+      .populate('writeups');
     
-    // Collect writeups
-    let writeups = [...category.writeups];
+    // Collect writeups (only published ones)
+    let writeups = category.writeups.filter(writeup => writeup.isPublished);
     
-    // Add writeups from subcategories
+    // Add writeups from subcategories (only published ones)
     subcategories.forEach(subcategory => {
-      writeups = writeups.concat(subcategory.writeups);
+      const publishedWriteups = subcategory.writeups.filter(writeup => writeup.isPublished);
+      writeups = writeups.concat(publishedWriteups);
     });
     
     // Sort by creation date
@@ -141,14 +124,17 @@ router.get('/subcategory/:subcategorySlug', async (req, res) => {
     const { subcategorySlug } = req.params;
     
     const subcategory = await Subcategory.findOne({ slug: subcategorySlug })
-      .populate('writeups.author', 'username')
-      .populate('parent', 'name slug');
+      .populate('writeups')
+      .populate('category', 'name slug');
       
     if (!subcategory) {
       return res.status(404).json({ message: 'Subcategory not found' });
     }
     
-    res.json(subcategory.writeups);
+    // Filter only published writeups
+    const publishedWriteups = subcategory.writeups.filter(writeup => writeup.isPublished);
+    
+    res.json(publishedWriteups);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching writeups', error: error.message });
   }
@@ -161,11 +147,11 @@ router.get('/:id', async (req, res) => {
     
     // Search in categories
     const category = await Category.findOne({ 'writeups._id': id })
-      .populate('writeups.author', 'username');
+      .populate('writeups');
       
     if (category) {
       const writeup = category.writeups.find(w => w._id.toString() === id);
-      if (writeup) {
+      if (writeup && writeup.isPublished) {
         return res.json({
           ...writeup.toObject(),
           category: {
@@ -179,16 +165,16 @@ router.get('/:id', async (req, res) => {
     
     // Search in subcategories
     const subcategory = await Subcategory.findOne({ 'writeups._id': id })
-      .populate('writeups.author', 'username')
-      .populate('parent', 'name slug');
+      .populate('writeups')
+      .populate('category', 'name slug');
       
     if (subcategory) {
       const writeup = subcategory.writeups.find(w => w._id.toString() === id);
-      if (writeup) {
+      if (writeup && writeup.isPublished) {
         return res.json({
           ...writeup.toObject(),
           category: {
-            _id: subcategory.parent._id,
+            _id: subcategory.category._id,
             name: subcategory.name,
             slug: subcategory.slug,
             isSubcategory: true
@@ -206,7 +192,7 @@ router.get('/:id', async (req, res) => {
 // Create writeup
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, description, content, categoryId, subcategoryId, difficulty, platform, platformUrl, bounty, tags, author } = req.body;
+    const { title, description, content, categoryId, subcategoryId, difficulty, platform, platformUrl, bounty, tags } = req.body;
     
   
     // Create new writeup
@@ -214,7 +200,6 @@ router.post('/', auth, async (req, res) => {
       title,
       description,
       content,
-      author,
       category: categoryId,
       subcategory: subcategoryId,
       difficulty,
@@ -272,10 +257,6 @@ router.put('/:id', auth, async (req, res) => {
     if (category) {
       const writeup = category.writeups.id(id);
       if (writeup) {
-        if (writeup.author.toString() !== req.user._id.toString()) {
-          return res.status(403).json({ message: 'Not authorized to update this writeup' });
-        }
-        
         writeup.title = title;
         writeup.description = description;
         writeup.content = content;
@@ -296,10 +277,6 @@ router.put('/:id', auth, async (req, res) => {
     if (subcategory) {
       const writeup = subcategory.writeups.id(id);
       if (writeup) {
-        if (writeup.author.toString() !== req.user._id.toString()) {
-          return res.status(403).json({ message: 'Not authorized to update this writeup' });
-        }
-        
         writeup.title = title;
         writeup.description = description;
         writeup.content = content;
@@ -331,10 +308,6 @@ router.delete('/:id', auth, async (req, res) => {
     if (category) {
       const writeup = category.writeups.id(id);
       if (writeup) {
-        if (writeup.author.toString() !== req.user._id.toString()) {
-          return res.status(403).json({ message: 'Not authorized to delete this writeup' });
-        }
-        
         writeup.remove();
         await category.save();
         return res.json({ message: 'Writeup deleted successfully' });
@@ -346,10 +319,6 @@ router.delete('/:id', auth, async (req, res) => {
     if (subcategory) {
       const writeup = subcategory.writeups.id(id);
       if (writeup) {
-        if (writeup.author.toString() !== req.user._id.toString()) {
-          return res.status(403).json({ message: 'Not authorized to delete this writeup' });
-        }
-        
         writeup.remove();
         await subcategory.save();
         return res.json({ message: 'Writeup deleted successfully' });
@@ -369,7 +338,7 @@ router.get('/categories', auth, async (req, res) => {
     
     const categoriesWithSubcategories = categories.map(category => ({
       ...category.toObject(),
-      subcategories: subcategories.filter(sub => sub.parent._id === category._id)
+      subcategories: subcategories.filter(sub => sub.category._id === category._id)
     }));
     
     res.json({ categories: categoriesWithSubcategories });
