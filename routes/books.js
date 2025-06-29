@@ -277,6 +277,9 @@ router.get('/:id/pdf', userAuth, async (req, res) => {
 // Get reading progress for a specific book
 router.get('/:id/progress', userAuth, async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
     const book = await Book.findById(req.params.id);
     
     if (!book) {
