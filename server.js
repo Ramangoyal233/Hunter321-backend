@@ -195,9 +195,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT;
+if (!PORT) {
+  throw new Error('❌ process.env.PORT is not defined. Do not set PORT manually on Render.');
+}
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🌐 CORS enabled for origins:`, allowedOrigins);
 });
