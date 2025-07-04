@@ -277,10 +277,6 @@ router.get('/:id/progress', userAuth, async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
-<<<<<<< HEAD
-=======
-
->>>>>>> 6e42baf (Deploy)
     const book = await Book.findById(req.params.id);
     if (!book) {
       return res.status(404).json({ message: 'Book not found' });
