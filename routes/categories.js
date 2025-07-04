@@ -124,13 +124,14 @@ router.get('/:categoryId', async (req, res) => {
 // Get subcategories for a specific category
 router.get('/:id/subcategories', async (req, res) => {
   try {
-    const subcategories = await Category.find({ 
-      parent: req.params.id,
+    console.log("category id", req.params.id);
+    const subcategories = await Subcategory.find({ 
+      category: req.params.id,
       isSubcategory: true 
     })
-    .populate('parent', 'name')
-    .sort({ name: 1 });
     
+    
+    console.log(subcategories);
     if (!subcategories) {
       return res.json({ subcategories: [] });
     }

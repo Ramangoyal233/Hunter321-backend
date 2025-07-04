@@ -216,9 +216,6 @@ router.get('/:id/pdf', userAuth, async (req, res) => {
       return res.status(404).json({ message: 'Book not found' });
     }
 
-    // Check if user has access to the book
-    // You might want to add additional checks here based on your requirements
-    // For example, checking if the user has purchased the book
 
     // Get the PDF filename from the URL
     let pdfFilename;
@@ -280,13 +277,15 @@ router.get('/:id/progress', userAuth, async (req, res) => {
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6e42baf (Deploy)
     const book = await Book.findById(req.params.id);
-    
     if (!book) {
       return res.status(404).json({ message: 'Book not found' });
     }
 
-    // Find the user's reading progress
     const progress = book.readingProgress.find(
       p => p.user.toString() === req.user._id.toString()
     );
@@ -849,7 +848,7 @@ router.put('/:id', adminAuth, upload, async (req, res) => {
       updateData.pdfUrl = `/uploads/books/${pdfFile.filename}`;
       // Delete old PDF file
       if (existingBook.pdfUrl) {
-        const oldPdfPath = path.join(path.resolve(__dirname, '../../public'), existingBook.pdfUrl);
+        const oldPdfPath = path.join(path.resolve(__dirname, '../'), 'uploads/books', existingBook.pdfUrl.split('/').pop());
         if (fs.existsSync(oldPdfPath)) {
           fs.unlink(oldPdfPath, (err) => {
             if (err) console.warn(`Could not delete old PDF file:`, err);
@@ -862,7 +861,7 @@ router.put('/:id', adminAuth, upload, async (req, res) => {
       updateData.coverImageUrl = `/uploads/covers/${coverImageFile.filename}`;
       // Delete old cover image file
       if (existingBook.coverImageUrl) {
-        const oldCoverPath = path.join(path.resolve(__dirname, '../../public'), existingBook.coverImageUrl);
+        const oldCoverPath = path.join(path.resolve(__dirname, '../'), 'uploads/covers', existingBook.coverImageUrl.split('/').pop());
         if (fs.existsSync(oldCoverPath)) {
           fs.unlink(oldCoverPath, (err) => {
             if (err) console.warn(`Could not delete old cover image:`, err);
@@ -902,7 +901,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
 
     // Delete the associated files from storage
     if (bookToDelete.pdfUrl) {
-      const pdfPath = path.join(path.resolve(__dirname, '../../public'), bookToDelete.pdfUrl);
+      const pdfPath = path.join(path.resolve(__dirname, '../'), 'uploads/books', bookToDelete.pdfUrl.split('/').pop());
       if (fs.existsSync(pdfPath)) {
         fs.unlink(pdfPath, (err) => {
           if (err) console.warn(`Could not delete PDF file:`, err);
@@ -911,7 +910,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
     }
 
     if (bookToDelete.coverImageUrl) {
-      const coverPath = path.join(path.resolve(__dirname, '../../public'), bookToDelete.coverImageUrl);
+      const coverPath = path.join(path.resolve(__dirname, '../'), 'uploads/covers', bookToDelete.coverImageUrl.split('/').pop());
       if (fs.existsSync(coverPath)) {
         fs.unlink(coverPath, (err) => {
           if (err) console.warn(`Could not delete cover image:`, err);
@@ -942,8 +941,8 @@ router.post('/fix-cover-images', adminAuth, async (req, res) => {
    
     
     // Get all cover image files
-    const projectRoot = path.resolve(__dirname, '../../');
-    const coversDir = path.join(projectRoot, 'public/uploads/covers');
+    const projectRoot = path.resolve(__dirname, '../');
+    const coversDir = path.join(projectRoot, 'uploads/covers');
     const coverFiles = fs.readdirSync(coversDir);
   
     

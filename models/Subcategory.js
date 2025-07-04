@@ -92,22 +92,14 @@ const subcategorySchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  icon: {
-    type: String
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true
-  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category'
   },
-  writeups: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Writeup'
-  }],
+  isSubcategory: {
+    type: Boolean,
+    default: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
